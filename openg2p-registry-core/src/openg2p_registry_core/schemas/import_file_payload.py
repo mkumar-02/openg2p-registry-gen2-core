@@ -16,5 +16,10 @@ class ImportFileConfigurationData(BaseModel):
 
 
 class ImportFileConfigurationRequestPayload(BaseModel):
+    import_file_configuration_id: Optional[str] = None
     register_id: Optional[str] = None
+    form_id: Optional[str] = None
+    data_model_id: Optional[str] = None
+    import_file_template_mnemonic: Optional[str] = None
+    import_file_template_description: Optional[str] = None
 

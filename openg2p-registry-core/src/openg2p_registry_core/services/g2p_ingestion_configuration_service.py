@@ -13,11 +13,13 @@ from sqlalchemy import select, func
 
 from ..models import (
     IncomingModelKeyPath,
+    IncomingModelRegisterSemanticPattern,
     IncomingModelSemanticPattern,
     IncomingTemplate,
     DataModel,
     SubscriptionActivityLog,
     G2PRegisterDefinition,
+    G2PRegisterSection,
 )
 from ..schemas import (
     IncomingModelKeyPathPayload,
@@ -27,6 +29,9 @@ from ..schemas import (
     IncomingModelSemanticPatternPayload,
     IncomingModelSemanticPatternUpdatePayload,
     IncomingModelSemanticPatternData,
+    IncomingModelRegisterSemanticPatternPayload,
+    IncomingModelRegisterSemanticPatternUpdatePayload,
+    IncomingModelRegisterSemanticPatternData,
     IncomingTemplatePayload,
     IncomingTemplateUpdatePayload,
     IncomingTemplateData,
@@ -225,6 +230,21 @@ class G2PIngestionConfigurationService(BaseService):
             )
         return existing
     
+    async def _validate_section_for_register(
+        self, session: AsyncSession, section_id: str, register_id: str
+    ) -> G2PRegisterSection:
+        sec = (
+            await session.execute(
+                select(G2PRegisterSection).where(G2PRegisterSection.section_id == section_id)
+            )
+        ).scalar_one_or_none()
+        if not sec or sec.register_id != register_id:
+            raise G2PRegistryException(
+                code=G2PRegistryErrorCodes.INVALID_REQUEST.value[1],
+                message="Section not found or does not belong to the specified register.",
+            )
+        return sec
+
     async def _validate_intake_form_id_exists(
         self, session: AsyncSession, intake_form_id: str
     ) -> G2PIntakeFormDefinition:
@@ -267,19 +287,26 @@ class G2PIngestionConfigurationService(BaseService):
             await self._validate_data_model_id_exists(session, pattern_payload.data_model_id)
             await self._validate_register_id_exists(session, pattern_payload.register_id)
             await self._validate_intake_form_id_exists(session, pattern_payload.intake_form_id)
+            if pattern_payload.section_id:
+                await self._validate_section_for_register(
+                    session, pattern_payload.section_id, pattern_payload.register_id
+                )
+            enricher = pattern_payload.raw_payload_enricher_class or ""
             pattern = IncomingModelSemanticPattern(
                 data_model_id=pattern_payload.data_model_id,
                 register_id=pattern_payload.register_id,
                 intake_form_id=pattern_payload.intake_form_id,
+                section_id=pattern_payload.section_id,
                 pattern_for_register=pattern_payload.pattern_for_register,
                 pattern_for_intake_form=pattern_payload.pattern_for_intake_form,
+                pattern_for_section=pattern_payload.pattern_for_section,
                 key_path_for_business_payload=pattern_payload.key_path_for_business_payload,
-                raw_payload_enricher_class=pattern_payload.raw_payload_enricher_class,
+                raw_payload_enricher_class=enricher,
             )
             session.add(pattern)
             await session.commit()
             await session.refresh(pattern)
-            return IncomingModelSemanticPatternData.model_validate(pattern)
+            return await self._build_semantic_pattern_data_with_mnemonics(session, pattern)
 
     async def get_semantic_pattern(
         self, semantic_pattern_id: str
@@ -325,10 +352,18 @@ class G2PIngestionConfigurationService(BaseService):
         async with session_maker() as session:
             pattern_obj = await self._get_semantic_pattern(session, semantic_pattern_id)
 
+            if pattern_payload.section_id is not None:
+                if pattern_payload.section_id:
+                    await self._validate_section_for_register(
+                        session, pattern_payload.section_id, pattern_obj.register_id
+                    )
+                pattern_obj.section_id = pattern_payload.section_id
             if pattern_payload.pattern_for_register is not None:
                 pattern_obj.pattern_for_register = pattern_payload.pattern_for_register
             if pattern_payload.pattern_for_intake_form is not None:
                 pattern_obj.pattern_for_intake_form = pattern_payload.pattern_for_intake_form
+            if pattern_payload.pattern_for_section is not None:
+                pattern_obj.pattern_for_section = pattern_payload.pattern_for_section
             if pattern_payload.key_path_for_business_payload is not None:
                 pattern_obj.key_path_for_business_payload = pattern_payload.key_path_for_business_payload
             if pattern_payload.raw_payload_enricher_class is not None:
@@ -336,7 +371,7 @@ class G2PIngestionConfigurationService(BaseService):
 
             await session.commit()
             await session.refresh(pattern_obj)
-            return IncomingModelSemanticPatternData.model_validate(pattern_obj)
+            return await self._build_semantic_pattern_data_with_mnemonics(session, pattern_obj)
 
     async def delete_semantic_pattern(self, semantic_pattern_id: str) -> IncomingModelSemanticPatternData:
         """Delete semantic pattern by ID and return deleted data."""
@@ -380,6 +415,12 @@ class G2PIngestionConfigurationService(BaseService):
         intake_form_obj = await self._validate_intake_form_id_exists(
             session, pattern_obj.intake_form_id
         )
+        section_mnemonic: str | None = None
+        if pattern_obj.section_id:
+            section_obj = await self._validate_section_for_register(
+                session, pattern_obj.section_id, pattern_obj.register_id
+            )
+            section_mnemonic = section_obj.section_mnemonic
 
         return IncomingModelSemanticPatternData(
             semantic_pattern_id=pattern_obj.semantic_pattern_id,
@@ -389,10 +430,121 @@ class G2PIngestionConfigurationService(BaseService):
             register_mnemonic=register_obj.register_mnemonic,
             intake_form_id=pattern_obj.intake_form_id,
             intake_form_mnemonic=intake_form_obj.form_mnemonic,
+            section_id=pattern_obj.section_id,
+            section_mnemonic=section_mnemonic,
             pattern_for_register=pattern_obj.pattern_for_register,
             pattern_for_intake_form=pattern_obj.pattern_for_intake_form,
+            pattern_for_section=pattern_obj.pattern_for_section,
             key_path_for_business_payload=pattern_obj.key_path_for_business_payload,
             raw_payload_enricher_class=pattern_obj.raw_payload_enricher_class,
+        )
+
+    async def create_register_semantic_pattern(
+        self, pattern_payload: IncomingModelRegisterSemanticPatternPayload
+    ) -> IncomingModelRegisterSemanticPatternData:
+        session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
+        async with session_maker() as session:
+            await self._validate_data_model_id_exists(session, pattern_payload.data_model_id)
+            await self._validate_register_id_exists(session, pattern_payload.register_id)
+            pattern = IncomingModelRegisterSemanticPattern(
+                data_model_id=pattern_payload.data_model_id,
+                register_id=pattern_payload.register_id,
+                pattern_for_register=pattern_payload.pattern_for_register,
+                key_path_for_record_identifier=pattern_payload.key_path_for_record_identifier,
+            )
+            session.add(pattern)
+            await session.commit()
+            await session.refresh(pattern)
+            return await self._build_register_semantic_pattern_data(session, pattern)
+
+    async def get_register_semantic_pattern(
+        self, register_semantic_pattern_id: str
+    ) -> IncomingModelRegisterSemanticPatternData:
+        session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
+        async with session_maker() as session:
+            pattern_obj = await self._get_register_semantic_pattern(session, register_semantic_pattern_id)
+            return await self._build_register_semantic_pattern_data(session, pattern_obj)
+
+    async def get_all_register_semantic_patterns(
+        self, current_page: int, page_size: int
+    ) -> tuple[list[IncomingModelRegisterSemanticPatternData], int, int]:
+        session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
+        async with session_maker() as session:
+            offset = (current_page - 1) * page_size
+            total_items_result = await session.execute(
+                select(func.count()).select_from(IncomingModelRegisterSemanticPattern)
+            )
+            total_items = total_items_result.scalar_one() or 0
+            result = await session.execute(
+                select(IncomingModelRegisterSemanticPattern)
+                .order_by(IncomingModelRegisterSemanticPattern.register_semantic_pattern_id)
+                .offset(offset)
+                .limit(page_size)
+            )
+            patterns = result.scalars().all()
+            out: list[IncomingModelRegisterSemanticPatternData] = []
+            for pattern in patterns:
+                out.append(await self._build_register_semantic_pattern_data(session, pattern))
+            number_of_pages = (total_items + page_size - 1) // page_size if total_items > 0 else 0
+            return out, total_items, number_of_pages
+
+    async def update_register_semantic_pattern(
+        self, pattern_payload: IncomingModelRegisterSemanticPatternUpdatePayload
+    ) -> IncomingModelRegisterSemanticPatternData:
+        session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
+        async with session_maker() as session:
+            pattern_obj = await self._get_register_semantic_pattern(
+                session, pattern_payload.register_semantic_pattern_id
+            )
+            if pattern_payload.pattern_for_register is not None:
+                pattern_obj.pattern_for_register = pattern_payload.pattern_for_register
+            if pattern_payload.key_path_for_record_identifier is not None:
+                pattern_obj.key_path_for_record_identifier = pattern_payload.key_path_for_record_identifier
+            await session.commit()
+            await session.refresh(pattern_obj)
+            return await self._build_register_semantic_pattern_data(session, pattern_obj)
+
+    async def delete_register_semantic_pattern(
+        self, register_semantic_pattern_id: str
+    ) -> IncomingModelRegisterSemanticPatternData:
+        session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
+        async with session_maker() as session:
+            pattern_obj = await self._get_register_semantic_pattern(session, register_semantic_pattern_id)
+            deleted = await self._build_register_semantic_pattern_data(session, pattern_obj)
+            await session.delete(pattern_obj)
+            await session.commit()
+            return deleted
+
+    async def _get_register_semantic_pattern(
+        self, session: AsyncSession, register_semantic_pattern_id: str
+    ) -> IncomingModelRegisterSemanticPattern:
+        pattern = await session.execute(
+            select(IncomingModelRegisterSemanticPattern).where(
+                IncomingModelRegisterSemanticPattern.register_semantic_pattern_id
+                == register_semantic_pattern_id
+            )
+        )
+        pattern_obj = pattern.scalar_one_or_none()
+        if not pattern_obj:
+            raise G2PRegistryException(
+                code=G2PRegistryErrorCodes.SEMANTIC_PATTERN_NOT_FOUND.value[1],
+                message="Register semantic pattern not found.",
+            )
+        return pattern_obj
+
+    async def _build_register_semantic_pattern_data(
+        self, session: AsyncSession, pattern_obj: IncomingModelRegisterSemanticPattern
+    ) -> IncomingModelRegisterSemanticPatternData:
+        data_model_obj = await self._validate_data_model_id_exists(session, pattern_obj.data_model_id)
+        register_obj = await self._validate_register_id_exists(session, pattern_obj.register_id)
+        return IncomingModelRegisterSemanticPatternData(
+            register_semantic_pattern_id=pattern_obj.register_semantic_pattern_id,
+            data_model_id=pattern_obj.data_model_id,
+            data_model_mnemonic=data_model_obj.data_model_mnemonic,
+            register_id=pattern_obj.register_id,
+            register_mnemonic=register_obj.register_mnemonic,
+            pattern_for_register=pattern_obj.pattern_for_register,
+            key_path_for_record_identifier=pattern_obj.key_path_for_record_identifier,
         )
 
     # IncomingTemplate Methods

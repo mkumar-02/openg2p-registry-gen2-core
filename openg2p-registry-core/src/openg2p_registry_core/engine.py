@@ -1,9 +1,10 @@
 import logging
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import NullPool
 
 from .config import Settings
 
-_config = Settings.get_config()
+_config = Settings.get_config(strict=False)
 _logger = logging.getLogger(_config.logging_default_logger_name)
 
 
@@ -36,8 +37,7 @@ def get_engine():
         _config.master_data_db_port,
         _config.master_data_db_dbname,
     )
-
-    db_engine_master_data = create_async_engine(db_datasource_master_data)
+    db_engine_master_data = create_async_engine(db_datasource_master_data, poolclass=NullPool)
 
     return {
         "db_engine_master_data": db_engine_master_data,

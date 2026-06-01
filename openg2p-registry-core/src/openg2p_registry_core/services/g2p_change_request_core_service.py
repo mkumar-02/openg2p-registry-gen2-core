@@ -18,6 +18,9 @@ class G2PChangeRequestCoreService(BaseService):
         self,
         change_request_request_payload: ChangeRequestRequestPayload,
         source_partner_id: str | None = None,
+        bearer_token: str | None = None,
+        requester_sub: str | None = None,
+        created_by: str | None = None,
     ) -> G2PRegisterChangeRequest:
         _logger.info("Creating core-data change request")
 
@@ -33,6 +36,9 @@ class G2PChangeRequestCoreService(BaseService):
         return await change_request_service.create_change_request(
             change_request_request_payload=change_request_request_payload,
             source_partner_id=source_partner_id,
+            created_by=created_by or change_request_request_payload.created_by,
+            bearer_token=bearer_token,
+            requester_sub=requester_sub,
         )
 
     async def approve_change_request_for_core_data(

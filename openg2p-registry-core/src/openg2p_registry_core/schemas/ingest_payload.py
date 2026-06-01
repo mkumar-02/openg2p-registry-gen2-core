@@ -35,6 +35,13 @@ class IngestionDataSearchResultData(BaseModel):
     register_id: Optional[str] = None
     register_mnemonic: Optional[str] = None
     semantic_pattern_id: Optional[str] = None
+
+    pipeline_action: Optional[str] = None
+    section_id: Optional[str] = None
+    section_mnemonic: Optional[str] = None
+    internal_record_id: Optional[str] = None
+    change_request_id: Optional[str] = None
+
     template_id: Optional[str] = None
     template_file_id: Optional[str] = None
     transformation_status: Optional[str] = None
@@ -164,10 +171,10 @@ class IncomingModelSemanticPatternPayload(BaseModel):
     data_model_id: str
     register_id: str
     intake_form_id: str
-    # section_id: str
-    pattern_for_register: str
+    section_id: Optional[str] = None
+    pattern_for_register: Optional[str] = None
     pattern_for_intake_form: str
-    # pattern_for_section: str
+    pattern_for_section: Optional[str] = None
     key_path_for_business_payload: str
     raw_payload_enricher_class: Optional[str] = None
 
@@ -177,10 +184,12 @@ class IncomingModelSemanticPatternPayload(BaseModel):
 
 class IncomingModelSemanticPatternUpdatePayload(BaseModel):
     """Update payload for IncomingModelSemanticPattern - only allows updating specific fields"""
+
     semantic_pattern_id: str
+    section_id: Optional[str] = None
     pattern_for_register: Optional[str] = None
     pattern_for_intake_form: Optional[str] = None
-    # pattern_for_section: Optional[str] = None
+    pattern_for_section: Optional[str] = None
     key_path_for_business_payload: Optional[str] = None
     raw_payload_enricher_class: Optional[str] = None
 
@@ -204,11 +213,57 @@ class IncomingModelSemanticPatternData(BaseModel):
     register_mnemonic: Optional[str] = None
     intake_form_id: str
     intake_form_mnemonic: Optional[str] = None
-    pattern_for_register: str
-    # pattern_for_section: str
+    section_id: Optional[str] = None
+    section_mnemonic: Optional[str] = None
+    pattern_for_register: Optional[str] = None
     pattern_for_intake_form: str
+    pattern_for_section: Optional[str] = None
     key_path_for_business_payload: str
     raw_payload_enricher_class: Optional[str] = None
+
+    class Config:
+        from_attributes: bool = True
+
+
+# =============================================================================
+# IncomingModelRegisterSemanticPattern Schemas
+# =============================================================================
+
+
+class IncomingModelRegisterSemanticPatternPayload(BaseModel):
+    data_model_id: str
+    register_id: str
+    pattern_for_register: str
+    key_path_for_record_identifier: str
+
+    class Config:
+        from_attributes: bool = True
+
+
+class IncomingModelRegisterSemanticPatternUpdatePayload(BaseModel):
+    register_semantic_pattern_id: str
+    pattern_for_register: Optional[str] = None
+    key_path_for_record_identifier: Optional[str] = None
+
+    class Config:
+        from_attributes: bool = True
+
+
+class GetIncomingRegisterSemanticPatternPayload(BaseModel):
+    register_semantic_pattern_id: str
+
+    class Config:
+        from_attributes: bool = True
+
+
+class IncomingModelRegisterSemanticPatternData(BaseModel):
+    register_semantic_pattern_id: str
+    data_model_id: str
+    data_model_mnemonic: Optional[str] = None
+    register_id: str
+    register_mnemonic: Optional[str] = None
+    pattern_for_register: str
+    key_path_for_record_identifier: str
 
     class Config:
         from_attributes: bool = True

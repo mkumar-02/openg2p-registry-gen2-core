@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, validates
 from openg2p_fastapi_common.models import BaseORMModel
 
 from .data_models import ProcessStatusEnum
+from .enum import PipelineActionEnum
 
 class IncomingRawData(BaseORMModel):
 
@@ -63,8 +64,16 @@ class IncomingClassifiedData(BaseORMModel):
     data_model_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     partner_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     register_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    # section_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    intake_form_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    pipeline_action: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        index=True,
+        default=PipelineActionEnum.ADD.value,
+    )
+    section_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    internal_record_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    change_request_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    intake_form_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     semantic_pattern_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     classified_date_time: Mapped[DateTime] = mapped_column(DateTime, nullable=False)
     transformation_status: Mapped[str] = mapped_column(String, nullable=False, index=True, default=ProcessStatusEnum.PENDING.value)

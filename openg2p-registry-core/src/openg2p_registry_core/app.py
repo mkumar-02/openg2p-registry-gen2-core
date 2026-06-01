@@ -14,6 +14,7 @@ from .controller_services import (
     G2PIngestControllerService,
     G2PIngestionConfigurationControllerService,
     G2PIngestionDataControllerService,
+    G2POutgestionDataControllerService,
     G2PIntakeFormDataControllerService,
     G2PIntakeFormMetadataControllerService,
     G2POutgestionConfigurationControllerService,
@@ -36,8 +37,10 @@ from .controller_services import (
     G2PScoreContributingAttributeControllerService,
     G2PCompletionScoreControllerService,
     G2PRegistrantAuthenticationControllerService,
+    G2PAwePolicyConfigurationControllerService,
+    G2PAweProxyControllerService,
 )
-from .helpers import MinioClient, PatternMatcher, TemplateHelper
+from .helpers import AweHelper, MinioClient, PatternMatcher, TemplateHelper
 from .models import (
     DataModel,
     DeduplicationChangerequestResult,
@@ -74,11 +77,14 @@ from .models import (
     G2PRegistryDocument,
     G2PRegistryImportFileConfiguration,
     G2PRegistryVcConfiguration,
+    G2PRegistryAwePolicyConfiguration,
+    G2PAweReqEvent,
     ImportFileProcessQueue,
     ImportFileProcessLog,
     IncomingClassifiedData,
     IncomingEnrichedTransformedData,
     IncomingModelKeyPath,
+    IncomingModelRegisterSemanticPattern,
     IncomingModelSemanticPattern,
     IncomingRawData,
     IncomingRawDataPayload,
@@ -103,6 +109,7 @@ from .services import (
     G2PChangeRequestWorkerService,
     G2PIngestionConfigurationService,
     G2PIngestionDataService,
+    G2POutgestionDataService,
     G2PIngestService,
     G2PIntakeFormDataService,
     G2PIntakeFormMetadataService,
@@ -122,6 +129,9 @@ from .services import (
     G2PCompletionScoreService,
     G2PGeoHierarchyService,
     G2PRegistrantAuthenticationService,
+    G2PAwePolicyConfigurationService,
+    G2PAweIntegrationService,
+    G2PAweWebhookService,
     InputMechanismMetadataService,
     InputMechanismDataService,
     ImportFileConfigurationService,
@@ -151,6 +161,7 @@ class Initializer(BaseInitializer):
         )
         PatternMatcher()
         KeymanagerCryptoHelper()
+        AweHelper()
 
         # Services
         G2PDataModelService()
@@ -163,6 +174,7 @@ class Initializer(BaseInitializer):
         G2PRegisterHierarchicalService()
         G2PIngestionConfigurationService()
         G2PIngestionDataService()
+        G2POutgestionDataService()
         G2POutgestionConfigurationService()
         G2PTemplateService()
         G2PTemplateFileService()
@@ -180,6 +192,9 @@ class Initializer(BaseInitializer):
         G2PCompletionScoreService()
         G2PGeoHierarchyService()
         G2PRegistrantAuthenticationService()
+        G2PAwePolicyConfigurationService()
+        G2PAweIntegrationService()
+        G2PAweWebhookService()
 
         # Controller Services
         G2PDataModelControllerService()
@@ -192,6 +207,7 @@ class Initializer(BaseInitializer):
         G2PRegisterSectionMetadataControllerService()
         G2PIngestionConfigurationControllerService()
         G2PIngestionDataControllerService()
+        G2POutgestionDataControllerService()
         G2POutgestionConfigurationControllerService()
         G2PDocumentControllerService()
         G2PTemplateFileControllerService()
@@ -210,6 +226,8 @@ class Initializer(BaseInitializer):
         G2PScoreContributingAttributeControllerService()
         G2PCompletionScoreControllerService()
         G2PRegistrantAuthenticationControllerService()
+        G2PAwePolicyConfigurationControllerService()
+        G2PAweProxyControllerService()
 
     def migrate_database(self, args):
         super().migrate_database(args)
@@ -230,6 +248,8 @@ class Initializer(BaseInitializer):
             await G2PRegisterDefinition.create_migrate()
             await G2PRegisterVerification.create_migrate()
             await G2PRegisterChangeRequest.create_migrate()
+            await G2PRegistryAwePolicyConfiguration.create_migrate()
+            await G2PAweReqEvent.create_migrate()
             await G2PRegisterScoreDefinition.create_migrate()
             await G2PRegisterScoreContributingAttribute.create_migrate()
             await G2PScoreComputeQueue.create_migrate()
@@ -261,6 +281,7 @@ class Initializer(BaseInitializer):
             await IncomingClassifiedData.create_migrate()
             await SubscriptionActivityLog.create_migrate()
             await IncomingModelSemanticPattern.create_migrate()
+            await IncomingModelRegisterSemanticPattern.create_migrate()
             await IncomingEnrichedTransformedData.create_migrate()
 
             # Outgoing Models

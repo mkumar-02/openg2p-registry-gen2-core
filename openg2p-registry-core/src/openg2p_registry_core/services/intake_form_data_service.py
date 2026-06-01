@@ -9,6 +9,11 @@ from sqlalchemy import Date as SQLDate, func, inspect, select, case
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from ..errors import G2PRegistryErrorCodes, G2PRegistryException
+from .g2p_awe_integration_service import G2PAweIntegrationService
+from .g2p_awe_status_reconcile import (
+    REGISTRY_INTAKE_FORM_ARTIFACT,
+    reconcile_artifact_status_summary,
+)
 from ..models import (
     ApprovalStatusEnum,
     ChangeRequestSourceEnum,
@@ -395,10 +400,22 @@ class G2PIntakeFormDataService(BaseService):
         await session.flush()
         return submission
 
-    async def finalize_submission(self, submission_id: str, finalized_by: str | None = None) -> SubmissionResponsePayload:
+    async def finalize_submission(
+        self,
+        submission_id: str,
+        finalized_by: str | None = None,
+        bearer_token: str | None = None,
+        requester_sub: str | None = None,
+    ) -> SubmissionResponsePayload:
         session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
         async with session_maker() as session:
-            submission = await self.finalize_submission_with_session(submission_id, session, finalized_by)
+            submission = await self.finalize_submission_with_session(
+                submission_id,
+                session,
+                finalized_by,
+                bearer_token=bearer_token,
+                requester_sub=requester_sub,
+            )
             await session.commit()
             return await self.get_submission_payload(submission.submission_id)
 
@@ -407,6 +424,8 @@ class G2PIntakeFormDataService(BaseService):
         submission_id: str,
         session,
         finalized_by: str | None = None,
+        bearer_token: str | None = None,
+        requester_sub: str | None = None,
     ) -> G2PIntakeFormSubmission:
         _ = finalized_by
         submission = await self._get_submission_or_error(submission_id, session)
@@ -416,6 +435,25 @@ class G2PIntakeFormDataService(BaseService):
         submission.last_updated_at = now
         session.add(submission)
         await session.flush()
+        section_payloads = await self._build_section_payloads(submission, session)
+        register_definition = await self._get_register_definition(submission.register_id, session)
+        intake_form = await self._validate_form(submission.form_id, submission.register_id, session)
+        source_data = [
+            record
+            for section in section_payloads
+            for record in (section.records or [])
+            if isinstance(record, dict)
+        ]
+        await G2PAweIntegrationService.get_component().start_intake_submission_workflow(
+            session,
+            submission,
+            bearer_token=bearer_token,
+            requester=requester_sub or submission.created_by,
+            record_name=self._extract_record_name(section_payloads),
+            register_mnemonic=register_definition.register_mnemonic,
+            intake_form_mnemonic=intake_form.form_mnemonic,
+            source_data=source_data,
+        )
         return submission
 
     async def approve_submission(self, submission_id: str, approved_by: str) -> SubmissionResponsePayload:
@@ -469,6 +507,77 @@ class G2PIntakeFormDataService(BaseService):
             await session.commit()
             return await self.get_submission_payload(submission.submission_id)
 
+    async def approve_submission_with_session(
+        self,
+        submission_id: str,
+        session,
+        approved_by: str | None = None,
+    ) -> G2PIntakeFormSubmission:
+        submission = await self._get_submission_or_error(submission_id, session)
+        if submission.approval_status == ApprovalStatusEnum.APPROVED.value:
+            return submission
+        if submission.approval_status != ApprovalStatusEnum.PENDING.value:
+            self._invalid_request(
+                f"Submission '{submission_id}' is already in approval_status "
+                f"'{submission.approval_status}'"
+            )
+        now = datetime.now()
+        submission.approval_status = ApprovalStatusEnum.APPROVED.value
+        submission.approved_by = approved_by or "system"
+        submission.approved_at = now
+        submission.last_updated_at = now
+        submission.register_ingest_process_status = ProcessStatusEnum.PENDING.value
+        submission.register_ingest_process_last_error_code = None
+        session.add(submission)
+        await session.flush()
+        return submission
+
+    async def reject_submission_with_session(
+        self,
+        submission_id: str,
+        session,
+        rejected_by: str | None = None,
+    ) -> G2PIntakeFormSubmission:
+        submission = await self._get_submission_or_error(submission_id, session)
+        if submission.approval_status == ApprovalStatusEnum.REJECTED.value:
+            return submission
+        if submission.approval_status != ApprovalStatusEnum.PENDING.value:
+            self._invalid_request(
+                f"Submission '{submission_id}' is already in approval_status "
+                f"'{submission.approval_status}'"
+            )
+        now = datetime.now()
+        submission.approval_status = ApprovalStatusEnum.REJECTED.value
+        submission.approved_by = rejected_by or "system"
+        submission.approved_at = now
+        submission.last_updated_at = now
+        session.add(submission)
+        await session.flush()
+        return submission
+
+    async def cancel_submission_with_session(
+        self,
+        submission_id: str,
+        session,
+        cancelled_by: str | None = None,
+    ) -> G2PIntakeFormSubmission:
+        submission = await self._get_submission_or_error(submission_id, session)
+        if submission.approval_status == ApprovalStatusEnum.CANCELLED.value:
+            return submission
+        if submission.approval_status != ApprovalStatusEnum.PENDING.value:
+            self._invalid_request(
+                f"Submission '{submission_id}' is already in approval_status "
+                f"'{submission.approval_status}'"
+            )
+        now = datetime.now()
+        submission.approval_status = ApprovalStatusEnum.CANCELLED.value
+        submission.approved_by = cancelled_by or "system"
+        submission.approved_at = now
+        submission.last_updated_at = now
+        session.add(submission)
+        await session.flush()
+        return submission
+
     async def delete_submission(self, submission_id: str) -> SubmissionResponsePayload:
         session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
         async with session_maker() as session:
@@ -521,12 +630,20 @@ class G2PIntakeFormDataService(BaseService):
         session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
         async with session_maker() as session:
             submission = await self._get_submission_or_error(submission_id, session)
+            if submission.awe_request_id:
+                await reconcile_artifact_status_summary(
+                    session,
+                    artifact_type=REGISTRY_INTAKE_FORM_ARTIFACT,
+                    artifact_id=submission.submission_id,
+                )
             sections = await self._build_section_payloads(submission, session)
-            return self._build_submission_response_payload(
+            response = self._build_submission_response_payload(
                 submission,
                 sections,
                 self._extract_record_name(sections),
             )
+            await session.commit()
+            return response
 
     async def search_submissions(
         self,
@@ -1230,6 +1347,8 @@ class G2PIntakeFormDataService(BaseService):
             created_by=submission.created_by,
             first_created_at=submission.first_created_at.isoformat() if submission.first_created_at else None,
             last_updated_at=submission.last_updated_at.isoformat() if submission.last_updated_at else None,
+            awe_request_id=submission.awe_request_id,
+            awe_request_status_summary=submission.awe_request_status_summary,
             section_payloads=section_payloads,
         )
 

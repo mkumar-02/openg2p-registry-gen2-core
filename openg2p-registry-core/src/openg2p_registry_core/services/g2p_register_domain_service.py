@@ -69,6 +69,9 @@ class G2PRegisterDomainService(BaseService):
     async def post_approve(self, change_request: G2PRegisterChangeRequest, session: AsyncSession):
         pass
 
+    async def post_ingest(self, register_id: str, register_row, session: AsyncSession):
+        pass
+
     async def populate_link_internal_record_id_for_intake_form(self, session: AsyncSession):
         pass
 

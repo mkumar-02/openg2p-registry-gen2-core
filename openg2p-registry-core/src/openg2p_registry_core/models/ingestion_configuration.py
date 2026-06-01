@@ -26,6 +26,23 @@ class IncomingModelKeyPath(BaseORMModel):
     is_list: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     key_path_for_list_elements: Mapped[str] = mapped_column(String, nullable=False)
 
+
+class IncomingModelRegisterSemanticPattern(BaseORMModel):
+    """First-pass resolver: target register + record identifier extraction for dynamic ADD/UPDATE."""
+
+    __tablename__ = "incoming_model_register_semantic_patterns"
+
+    register_semantic_pattern_id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+    data_model_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    register_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    pattern_for_register: Mapped[str] = mapped_column(String, nullable=False)
+    key_path_for_record_identifier: Mapped[str] = mapped_column(String, nullable=False)
+
+    __table_args__ = (Index("ix_incoming_model_register_semantic_data_model", "data_model_id"),)
+
+
 class IncomingModelSemanticPattern(BaseORMModel):
 
     __tablename__ = "incoming_model_semantic_patterns"
@@ -33,11 +50,11 @@ class IncomingModelSemanticPattern(BaseORMModel):
     semantic_pattern_id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     data_model_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     register_id: Mapped[str] = mapped_column(String, nullable=False)
-    intake_form_id: Mapped[str] = mapped_column(String, nullable=False)
-    # section_id: Mapped[str] = mapped_column(String, nullable=False)
-    pattern_for_register: Mapped[str] = mapped_column(String, nullable=False)
-    pattern_for_intake_form: Mapped[str] = mapped_column(String, nullable=False)
-    # pattern_for_section: Mapped[str] = mapped_column(String, nullable=False)
+    intake_form_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    section_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    pattern_for_register: Mapped[str | None] = mapped_column(String, nullable=True)
+    pattern_for_intake_form: Mapped[str] = mapped_column(String, nullable=True)
+    pattern_for_section: Mapped[str | None] = mapped_column(String, nullable=True)
     key_path_for_business_payload: Mapped[str] = mapped_column(String, nullable=False)
     raw_payload_enricher_class: Mapped[str] = mapped_column(String, nullable=False)
 

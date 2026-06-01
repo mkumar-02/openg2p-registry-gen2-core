@@ -98,8 +98,8 @@ class G2PCompletionScoreService(BaseService):
         sections = (await session.execute(stmt)).scalars().all()
 
         for section in sections:
-            # Exclude PARENT-REGISTER sections (section_register_id != register_id)
-            if section.section_register_id != register_id:
+            # Exclude cross-register parent references; list sections are allowed
+            if section.section_register_id != register_id and not section.is_list:
                 continue
             queue_row = G2PCompletionScoreComputationQueue(
                 register_id=register_id,
@@ -382,7 +382,7 @@ class G2PCompletionScoreService(BaseService):
             )
             ideal = 0.0
             for s in sections:
-                if s.section_register_id != register_id:
+                if s.section_register_id != register_id and not s.is_list:
                     continue
                 ideal += s.section_weightage or 0.0
             return IdealRegisterScoreData(

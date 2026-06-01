@@ -5,11 +5,13 @@ class ApprovalStatusEnum(StrEnum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
 
 
 class ChangeRequestSourceEnum(StrEnum):
     # TODO: REMOVE INATKE_FORM and update worker
     PARTNER = "PARTNER"
+    INGESTION_PIPELINE = "PARTNER"
     # INTAKE_FORM = "INTAKE_FORM"
     # DIRECT -> STAFF_PORTAL
     STAFF_PORTAL = "STAFF_PORTAL"
@@ -60,6 +62,11 @@ class MaritalStatusEnum(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class PipelineActionEnum(StrEnum):
+    ADD = "ADD"
+    UPDATE = "UPDATE"
+
+
 class ProcessStatusEnum(StrEnum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
     PENDING = "PENDING"
@@ -79,6 +86,14 @@ class RegisterPurposeEnum(StrEnum):
     PROGRAM_REGISTER = "PROGRAM_REGISTER"
     TABLE = "TABLE"
     CORE_TABLE = "CORE_TABLE"
+
+
+class AwePolicyScopeEnum(StrEnum):
+    """Which registry artefact an AWE policy configuration row applies to."""
+
+    REGISTER = "REGISTER"
+    INTAKE_FORM = "INTAKE_FORM"
+    SECTION = "SECTION"
 
 
 class ShapeTypeEnum(StrEnum):

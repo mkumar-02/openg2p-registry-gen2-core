@@ -84,7 +84,12 @@ class G2PIngestService(BaseService):
                     incoming_raw_data.classification_status = ProcessStatusEnum.PROCESSED.value
                     incoming_raw_data.classification_date_time = datetime.now()
 
-                    semantic_pattern_id = await self._get_semantic_pattern_id(data_model.data_model_id, register_id, intake_form_id, session)
+                    semantic_pattern_id = await self._get_semantic_pattern_id(
+                        register_id,
+                        intake_form_id,
+                        data_model.data_model_id,
+                        session,
+                    )
 
                     session.add(
                         IncomingClassifiedData(
@@ -142,16 +147,14 @@ class G2PIngestService(BaseService):
         """Get incoming partner from master-data-db by partner mnemonic"""
         master_data_engine = get_engines().get("db_engine_master_data")
         master_data_session_maker = async_sessionmaker(master_data_engine, expire_on_commit=False)
-
         async with master_data_session_maker() as master_data_session:
-            partner: IncomingPartner = (
+            partner: IncomingPartner | None = (
                 await master_data_session.execute(
                     select(IncomingPartner).where(
                         IncomingPartner.partner_mnemonic == partner_mnemonic
                     )
                 )
             ).scalar_one_or_none()
-
             if not partner:
                 raise G2PRegistryException(
                     code=G2PRegistryErrorCodes.PARTNER_NOT_REGISTERED.value[1],
@@ -187,19 +190,44 @@ class G2PIngestService(BaseService):
                 )
             )
         ).scalar_one_or_none()
+        if incoming_model_key_path is None:
+            raise G2PRegistryException(
+                code=G2PRegistryErrorCodes.INVALID_REQUEST.value[1],
+                message=(
+                    "No incoming_model_key_paths row for "
+                    f"data_model_id={data_model_id}; configure key paths for this model"
+                ),
+            )
+
         partner_mnemonic, signature, signature_payload = pattern_matcher.get_signature_pattern_path(
             incoming_model_key_path, ingest_data
         )
-        if not partner_mnemonic or not signature or not signature_payload:
+        missing_parts: List[str] = []
+        if not partner_mnemonic:
+            missing_parts.append(
+                f"sender/partner key (path {incoming_model_key_path.key_path_for_sender!r})"
+            )
+        if not signature:
+            missing_parts.append(
+                f"signature key (path {incoming_model_key_path.key_path_for_signature!r})"
+            )
+        if not signature_payload:
+            missing_parts.append(
+                "signature payload key (path "
+                f"{incoming_model_key_path.key_path_for_signature_payload!r})"
+            )
+        if missing_parts:
             raise G2PRegistryException(
                 code=G2PRegistryErrorCodes.INVALID_REQUEST.value[1],
-                message=G2PRegistryErrorCodes.INVALID_REQUEST.value[0],
+                message=(
+                    "Ingest envelope missing required JSONPath values for partner routing: "
+                    + "; ".join(missing_parts)
+                ),
             )
 
         incoming_partner = await self._get_partner_from_partner_mnemonic(
             partner_mnemonic
         )
-
         return incoming_partner, signature, signature_payload, incoming_model_key_path
 
     async def _validate_signature(self, keymanager_reference_id: str, signature: str, signature_payload: Dict):
@@ -257,22 +285,26 @@ class G2PIngestService(BaseService):
         return ingest_data_payloads
 
     async def _get_semantic_pattern_id(
-        self, data_model_id: str, register_id: str, intake_form_id: str, session: Session
+        self, register_id: str, intake_form_id: str, data_model_id: str, session: Session
     ) -> str:
-        semantic_pattern: IncomingModelSemanticPattern | None = (
+        pattern_row = (
             await session.execute(
                 select(IncomingModelSemanticPattern).where(
-                    IncomingModelSemanticPattern.data_model_id == data_model_id,
                     IncomingModelSemanticPattern.register_id == register_id,
                     IncomingModelSemanticPattern.intake_form_id == intake_form_id,
+                    IncomingModelSemanticPattern.data_model_id == data_model_id,
                 )
-            )   
+            )
         ).scalar_one_or_none()
-        
-        if not semantic_pattern:
+
+        if pattern_row is None:
             raise G2PRegistryException(
-                code=G2PRegistryErrorCodes.SEMANTIC_PATTERN_NOT_FOUND.value[1],
-                message=G2PRegistryErrorCodes.SEMANTIC_PATTERN_NOT_FOUND.value[0],
+                code=G2PRegistryErrorCodes.INVALID_REQUEST.value[1],
+                message=(
+                    "No incoming_model_semantic_patterns row for "
+                    f"register_id={register_id}, intake_form_id={intake_form_id}, "
+                    f"data_model_id={data_model_id}"
+                ),
             )
 
-        return semantic_pattern.semantic_pattern_id
+        return pattern_row.semantic_pattern_id

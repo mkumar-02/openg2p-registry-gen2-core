@@ -1,13 +1,19 @@
 import re
 import json
+import logging
 from typing import Tuple, Dict, Optional, Any
 from jsonpath_ng import parse as jsonpath_parse
 
 from openg2p_fastapi_common.service import BaseService
 
-from ..models import DataModel, IncomingModelKeyPath, IncomingModelSemanticPattern
+from ..models import (
+    DataModel,
+    IncomingModelKeyPath,
+    IncomingModelRegisterSemanticPattern,
+    IncomingModelSemanticPattern,
+)
 
-
+_logger = logging.getLogger("g2p-registry-core")
 class PatternMatcher(BaseService):
     """
     Pattern format:
@@ -97,19 +103,51 @@ class PatternMatcher(BaseService):
         )
         return data_model_mnemonic
 
+    def validate_register_semantic_pattern_match(
+        self, register_pattern: IncomingModelRegisterSemanticPattern, data: Dict
+    ) -> bool:
+        return bool(
+            self._extract_with_pattern(data, register_pattern.pattern_for_register)
+        )
+
+    def extract_record_identifier_value(self, data: Dict, key_path: str) -> Optional[str]:
+        raw = self._extract_jsonpath(data, key_path)
+        if raw is None:
+            return None
+        value = str(raw).strip()
+        return value or None
+
+    def validate_intake_form_pattern_only(
+        self, incoming_model_semantic_pattern: IncomingModelSemanticPattern, data: Dict
+    ) -> bool:
+        return bool(
+            self._extract_with_pattern(
+                data, incoming_model_semantic_pattern.pattern_for_intake_form
+            )
+        )
+
+    def validate_section_pattern_only(
+        self, incoming_model_semantic_pattern: IncomingModelSemanticPattern, data: Dict
+    ) -> bool:
+        section_pat = incoming_model_semantic_pattern.pattern_for_section
+        if not section_pat:
+            return False
+        return bool(self._extract_with_pattern(data, section_pat))
+
     def validate_semantic_pattern_match(
         self, incoming_model_semantic_pattern: IncomingModelSemanticPattern, data: Dict
     ) -> bool:
-        register = self._extract_with_pattern(
-            data, incoming_model_semantic_pattern.pattern_for_register
-        )
+        """Legacy: register + intake form. Omit register match when pattern_for_register is null (new-style row)."""
+        if incoming_model_semantic_pattern.pattern_for_register:
+            register = self._extract_with_pattern(
+                data, incoming_model_semantic_pattern.pattern_for_register
+            )
+            if not register:
+                return False
         intake_form = self._extract_with_pattern(
             data, incoming_model_semantic_pattern.pattern_for_intake_form
         )
-        if register and intake_form:
-            return True
-
-        return False
+        return bool(intake_form)
 
     def get_ingest_data_list_elements_path_expr(
         self, incoming_model_key_path: IncomingModelKeyPath, data: Dict

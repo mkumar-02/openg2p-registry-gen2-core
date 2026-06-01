@@ -4,9 +4,35 @@ from openg2p_fastapi_common.schemas import (
     G2PResponseBody,
 )
 from .outgest_payload import (
+    OutgestionSummaryData,
+    OutgestionDataSearchResultData,
     OutgoingTopicData,
     OutgoingTemplateData,
 )
+
+
+# =============================================================================
+# Outgestion Summary Response
+# =============================================================================
+
+class OutgestionSummaryDataResponseBody(G2PResponseBody):
+    response_payload: Optional[OutgestionSummaryData] = None
+
+
+class OutgestionSummaryDataResponse(G2PResponse):
+    response_body: Optional[OutgestionSummaryDataResponseBody] = None
+
+
+# =============================================================================
+# Outgestion Search Response
+# =============================================================================
+
+class OutgestionDataSearchResultsResponseBody(G2PResponseBody):
+    response_payload: Optional[List[OutgestionDataSearchResultData]] = None
+
+
+class OutgestionDataSearchResultsResponse(G2PResponse):
+    response_body: Optional[OutgestionDataSearchResultsResponseBody] = None
 
 
 # =============================================================================

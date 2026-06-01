@@ -11,6 +11,9 @@ from ..schemas import (
     IncomingModelSemanticPatternPayload,
     IncomingModelSemanticPatternUpdatePayload,
     IncomingModelSemanticPatternData,
+    IncomingModelRegisterSemanticPatternPayload,
+    IncomingModelRegisterSemanticPatternUpdatePayload,
+    IncomingModelRegisterSemanticPatternData,
     IncomingTemplatePayload,
     IncomingTemplateUpdatePayload,
     IncomingTemplateData,
@@ -107,6 +110,43 @@ class G2PIngestionConfigurationControllerService(BaseService):
         """Delete semantic pattern"""
         return await self.g2p_ingestion_configuration_service.delete_semantic_pattern(
             semantic_pattern_id
+        )
+
+    async def create_register_semantic_pattern(
+        self, pattern_payload: IncomingModelRegisterSemanticPatternPayload
+    ) -> IncomingModelRegisterSemanticPatternData:
+        return await self.g2p_ingestion_configuration_service.create_register_semantic_pattern(
+            pattern_payload
+        )
+
+    async def get_register_semantic_pattern(
+        self, register_semantic_pattern_id: str
+    ) -> IncomingModelRegisterSemanticPatternData:
+        return await self.g2p_ingestion_configuration_service.get_register_semantic_pattern(
+            register_semantic_pattern_id
+        )
+
+    async def get_all_register_semantic_patterns(
+        self, current_page: Optional[int] = 1, page_size: Optional[int] = 10
+    ) -> tuple[list[IncomingModelRegisterSemanticPatternData], int, int]:
+        current_page = current_page or 1
+        page_size = page_size or 10
+        return await self.g2p_ingestion_configuration_service.get_all_register_semantic_patterns(
+            current_page, page_size
+        )
+
+    async def update_register_semantic_pattern(
+        self, pattern_payload: IncomingModelRegisterSemanticPatternUpdatePayload
+    ) -> IncomingModelRegisterSemanticPatternData:
+        return await self.g2p_ingestion_configuration_service.update_register_semantic_pattern(
+            pattern_payload
+        )
+
+    async def delete_register_semantic_pattern(
+        self, register_semantic_pattern_id: str
+    ) -> IncomingModelRegisterSemanticPatternData:
+        return await self.g2p_ingestion_configuration_service.delete_register_semantic_pattern(
+            register_semantic_pattern_id
         )
 
     async def create_template(

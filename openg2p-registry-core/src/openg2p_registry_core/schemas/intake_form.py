@@ -36,6 +36,8 @@ class IntakeFormData(BaseModel):
     number_of_verifications_done: Optional[int] = None
     created_by: Optional[str] = None
     last_updated_at: Optional[str] = None
+    awe_request_id: Optional[str] = None
+    awe_request_status_summary: Optional[str] = None
 
     deduplication_status_vs_intake_forms: Optional[str] = None
     deduplication_intake_forms_process_timestamp: Optional[str] = None

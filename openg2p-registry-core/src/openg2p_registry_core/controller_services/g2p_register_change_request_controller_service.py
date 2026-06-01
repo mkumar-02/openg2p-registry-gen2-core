@@ -10,10 +10,12 @@ from ..schemas.change_request import (
     ChangeRequestRequest, ChangeRequestRequestPayload, ChangeRequestResponsePayload,
     NumberOfPendingChangeRequestsData, NumberOfCrossRegisterChangesData,
     CrossRegisterChangeRequestData, ChangeRequestData,
+    ChangeRequestSequenceCheckData,
     VerificationData, AddVerificationPayload,
     GetNumberOfPendingChangeRequestsRequest, GetNumberOfCrossRegisterChangesRequest,
     GetCrossRegisterChangesRequest,
     GetChangeRequestsRequest, GetChangeRequestRequest,
+    CheckChangeRequestSequenceRequest,
     GetVerificationsRequest, AddVerificationRequest,
     GetChangeRequestSummaryDataRequest, ChangeRequestSummaryData,
     SearchChangeRequestRequest, ChangeRequestSearchResultData
@@ -24,7 +26,13 @@ _logger = logging.getLogger('g2p-register-change_request-controller-service')
 
 class G2PRegisterChangerequestControllerService(BaseService):
 
-    async def create_change_request(self, change_request_request: ChangeRequestRequest) -> ChangeRequestResponsePayload:
+    async def create_change_request(
+        self,
+        change_request_request: ChangeRequestRequest,
+        *,
+        bearer_token: str | None = None,
+        requester_sub: str | None = None,
+    ) -> ChangeRequestResponsePayload:
         _logger.info("Creating change request through controller service")
         service = G2PRegisterChangeRequestService.get_component()
         change_request_request_payload: ChangeRequestRequestPayload = change_request_request.request_body.request_payload
@@ -40,6 +48,8 @@ class G2PRegisterChangerequestControllerService(BaseService):
             change_request_request_payload=change_request_request_payload,
             source_partner_id=change_request_request.request_header.sender_app_mnemonic,
             created_by=created_by,
+            bearer_token=bearer_token,
+            requester_sub=requester_sub,
         )
 
         change_request_response_payload: ChangeRequestResponsePayload = self._build_change_request_response_payload(change_request_request_payload, g2p_register_change_request)
@@ -125,6 +135,19 @@ class G2PRegisterChangerequestControllerService(BaseService):
         change_request_data: ChangeRequestData = await service.get_change_request(change_request_id)
         return change_request_data
 
+    async def check_change_request_sequence(
+        self, check_change_request_sequence_request: CheckChangeRequestSequenceRequest
+    ) -> ChangeRequestSequenceCheckData:
+        change_request_id = (
+            check_change_request_sequence_request.request_body.request_payload.change_request_id
+        )
+        _logger.info(
+            "Checking change request sequence for change_request_id: %s through controller service",
+            change_request_id,
+        )
+        service = G2PRegisterChangeRequestService.get_component()
+        return await service.get_change_request_sequence_check(change_request_id)
+
     def _build_change_request_response_payload(self, change_request_request_payload: ChangeRequestRequestPayload, g2p_register_change_request: G2PRegisterChangeRequest) -> ChangeRequestResponsePayload:
         return ChangeRequestResponsePayload(
             record_name=g2p_register_change_request.record_name,
@@ -140,7 +163,9 @@ class G2PRegisterChangerequestControllerService(BaseService):
             created_by=g2p_register_change_request.created_by,
             created_at=str(g2p_register_change_request.created_at) if g2p_register_change_request.created_at else None,
             approved_by=g2p_register_change_request.approved_by,
-            approved_at=str(g2p_register_change_request.approved_at) if g2p_register_change_request.approved_at else None
+            approved_at=str(g2p_register_change_request.approved_at) if g2p_register_change_request.approved_at else None,
+            awe_request_id=g2p_register_change_request.awe_request_id,
+            awe_request_status_summary=g2p_register_change_request.awe_request_status_summary,
         )
 
     async def get_verifications_for_change_request(self, get_verifications_request: GetVerificationsRequest) -> tuple[list[VerificationData], G2PPaginationResponse]:

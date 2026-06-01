@@ -4,7 +4,46 @@ from datetime import datetime
 
 
 # =============================================================================
-# Outgest Data Schemas (response payloads)
+# Outgestion Data Schemas (response payloads)
+# =============================================================================
+
+class OutgestionSummaryData(BaseModel):
+    no_of_messages: int
+    no_of_topics: int
+    no_of_data_models: int
+
+
+class OutgestionDataSearchResultData(BaseModel):
+    outgest_id: str
+    payload_id: str
+    change_request_id: Optional[str] = None
+    intake_form_submission_id: Optional[str] = None
+    internal_record_id: str
+    register_id: str
+    register_mnemonic: Optional[str] = None
+    data_model_id: str
+    data_model_mnemonic: Optional[str] = None
+    topic_id: str
+    websub_topic: Optional[str] = None
+    created_at: datetime
+    changed_by: str
+    changed_at: datetime
+    approved_by: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    changed_by_partner_id: Optional[str] = None
+    partner_mnemonic: Optional[str] = None
+    transformation_status: str
+    transformation_datetime: Optional[datetime] = None
+    transformation_number_of_attempts: Optional[int] = None
+    transformation_latest_error_code: Optional[str] = None
+    publish_status: Optional[str] = None
+    publish_datetime: Optional[datetime] = None
+    publish_number_of_attempts: Optional[int] = None
+    publish_latest_error_code: Optional[str] = None
+
+
+# =============================================================================
+# Outgest Configuration Data Schemas (response payloads)
 # =============================================================================
 
 class OutgoingTopicData(BaseModel):
@@ -97,3 +136,7 @@ class GetOutgoingTemplatePayload(BaseModel):
 
 class EmptyOutgestionRequestPayload(BaseModel):
     pass
+
+
+class GetOutgestionDataRequestPayload(BaseModel):
+    outgest_id: str

@@ -17,7 +17,11 @@ _logger = logging.getLogger("g2p-change-request-core-controller-service")
 
 class G2PChangeRequestCoreControllerService(BaseService):
     async def create_change_request_for_core_data(
-        self, change_request_request: ChangeRequestRequest
+        self,
+        change_request_request: ChangeRequestRequest,
+        *,
+        bearer_token: str | None = None,
+        requester_sub: str | None = None,
     ) -> ChangeRequestResponsePayload:
         _logger.info("Creating core-data change request through controller service")
         payload: ChangeRequestRequestPayload = (
@@ -35,10 +39,14 @@ class G2PChangeRequestCoreControllerService(BaseService):
         await domain_service.validate_domain_attributes(payload)
 
         service = G2PChangeRequestCoreService.get_component()
+        created_by = payload.created_by or change_request_request.request_header.sender_app_mnemonic
         g2p_register_change_request: G2PRegisterChangeRequest = (
             await service.create_change_request_for_core_data(
                 change_request_request_payload=payload,
                 source_partner_id=change_request_request.request_header.sender_app_mnemonic,
+                bearer_token=bearer_token,
+                requester_sub=requester_sub,
+                created_by=created_by,
             )
         )
 

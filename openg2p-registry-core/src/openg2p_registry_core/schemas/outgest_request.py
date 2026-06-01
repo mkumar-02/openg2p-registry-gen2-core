@@ -83,3 +83,23 @@ class GetAllOutgoingTemplatesRequestBody(G2PRequestBody):
 
 class GetAllOutgoingTemplatesRequest(G2PRequest):
     request_body: GetAllOutgoingTemplatesRequestBody
+
+
+# =============================================================================
+# Outgestion Data Requests
+# =============================================================================
+
+class GetOutgestionSummaryDataRequestBody(G2PRequestBody):
+    request_payload: EmptyOutgestionRequestPayload
+
+
+class GetOutgestionSummaryDataRequest(G2PRequest):
+    request_body: GetOutgestionSummaryDataRequestBody
+
+
+class SearchOutgestionDataRequestBody(G2PRequestBody):
+    request_payload: EmptyOutgestionRequestPayload
+
+
+class SearchOutgestionDataRequest(G2PRequest):
+    request_body: SearchOutgestionDataRequestBody

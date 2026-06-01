@@ -12,6 +12,7 @@ from .ingest_payload import (
     IncomingModelKeyPathData,
     IncomingModelKeyPathListData,
     IncomingModelSemanticPatternData,
+    IncomingModelRegisterSemanticPatternData,
     IncomingTemplateData,
     DataModelData,
     SubscriptionActivityLogData,
@@ -134,6 +135,27 @@ class IncomingModelSemanticPatternsResponseBody(G2PResponseBody):
 
 class IncomingModelSemanticPatternsResponse(G2PResponse):
     response_body: Optional[IncomingModelSemanticPatternsResponseBody] = None
+
+
+# =============================================================================
+# IncomingModelRegisterSemanticPattern Response Schemas
+# =============================================================================
+
+
+class IncomingModelRegisterSemanticPatternResponseBody(G2PResponseBody):
+    response_payload: Optional[IncomingModelRegisterSemanticPatternData] = None
+
+
+class IncomingModelRegisterSemanticPatternResponse(G2PResponse):
+    response_body: Optional[IncomingModelRegisterSemanticPatternResponseBody] = None
+
+
+class IncomingModelRegisterSemanticPatternsResponseBody(G2PResponseBody):
+    response_payload: Optional[List[IncomingModelRegisterSemanticPatternData]] = None
+
+
+class IncomingModelRegisterSemanticPatternsResponse(G2PResponse):
+    response_body: Optional[IncomingModelRegisterSemanticPatternsResponseBody] = None
 
 
 # =============================================================================

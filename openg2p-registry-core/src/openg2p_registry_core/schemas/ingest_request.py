@@ -14,6 +14,9 @@ from .ingest_payload import (
     IncomingModelSemanticPatternPayload,
     GetIncomingSemanticPatternPayload,
     IncomingModelSemanticPatternUpdatePayload,
+    IncomingModelRegisterSemanticPatternPayload,
+    GetIncomingRegisterSemanticPatternPayload,
+    IncomingModelRegisterSemanticPatternUpdatePayload,
     IncomingTemplatePayload,
     GetIncomingTemplatePayload,
     IncomingTemplateUpdatePayload,
@@ -162,6 +165,43 @@ class GetAllIncomingSemanticPatternsRequestBody(G2PRequestBody):
 
 class GetAllIncomingSemanticPatternsRequest(G2PRequest):
     request_body: GetAllIncomingSemanticPatternsRequestBody
+
+
+# =============================================================================
+# IncomingModelRegisterSemanticPattern Request Schemas
+# =============================================================================
+
+
+class IncomingModelRegisterSemanticPatternRequestBody(G2PRequestBody):
+    request_payload: IncomingModelRegisterSemanticPatternPayload
+
+
+class IncomingModelRegisterSemanticPatternRequest(G2PRequest):
+    request_body: IncomingModelRegisterSemanticPatternRequestBody
+
+
+class IncomingModelRegisterSemanticPatternIdRequestBody(G2PRequestBody):
+    request_payload: GetIncomingRegisterSemanticPatternPayload
+
+
+class IncomingModelRegisterSemanticPatternIdRequest(G2PRequest):
+    request_body: IncomingModelRegisterSemanticPatternIdRequestBody
+
+
+class IncomingModelRegisterSemanticPatternUpdateRequestBody(G2PRequestBody):
+    request_payload: IncomingModelRegisterSemanticPatternUpdatePayload
+
+
+class IncomingModelRegisterSemanticPatternUpdateRequest(G2PRequest):
+    request_body: IncomingModelRegisterSemanticPatternUpdateRequestBody
+
+
+class GetAllIncomingRegisterSemanticPatternsRequestBody(G2PRequestBody):
+    request_payload: EmptyIngestionRequestPayload
+
+
+class GetAllIncomingRegisterSemanticPatternsRequest(G2PRequest):
+    request_body: GetAllIncomingRegisterSemanticPatternsRequestBody
 
 
 # =============================================================================

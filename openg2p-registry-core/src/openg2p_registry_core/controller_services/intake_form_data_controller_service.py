@@ -44,9 +44,16 @@ class G2PIntakeFormDataControllerService(BaseService):
     async def finalize_intake_form_submission(
         self,
         request: FinalizeSubmissionRequest,
+        *,
+        bearer_token: str | None = None,
+        requester_sub: str | None = None,
     ) -> SubmissionResponsePayload:
         payload = request.request_body.request_payload
-        return await G2PIntakeFormDataService.get_component().finalize_submission(payload.submission_id)
+        return await G2PIntakeFormDataService.get_component().finalize_submission(
+            payload.submission_id,
+            bearer_token=bearer_token,
+            requester_sub=requester_sub,
+        )
 
     async def delete_intake_form_submission(
         self,

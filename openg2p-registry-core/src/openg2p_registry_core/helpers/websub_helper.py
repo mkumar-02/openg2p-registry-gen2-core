@@ -1,3 +1,4 @@
+import json
 import httpx
 from typing import Dict
 from openg2p_fastapi_common.service import BaseService
@@ -9,7 +10,7 @@ class WebsubHelper(BaseService):
     def __init__(self):
         super().__init__()
         self.websub_base_url = _config.websub_base_url
-    
+
     def register_topic(self, topic: str):
         with httpx.Client() as client:
             url = f"{self.websub_base_url}/hub/"
@@ -19,7 +20,7 @@ class WebsubHelper(BaseService):
             }
             response = client.post(url, data=data)
             response.raise_for_status()
-        
+
     def deregister_topic(self, topic: str):
         with httpx.Client() as client:
             url = f"{self.websub_base_url}/hub/"
@@ -29,18 +30,14 @@ class WebsubHelper(BaseService):
             }
             response = client.post(url, data=data)
             response.raise_for_status()
-    
+
     def publish(self, topic: str, payload: Dict):
         with httpx.Client() as client:
             url = f"{self.websub_base_url}/hub/"
-            headers = {
-                "Content-Type": "application/json",
-                "Link": f"<{self.websub_base_url}/hub/>; rel=\"hub\", <{topic}>; rel=\"self\""
-            }
             data = {
                 "hub.mode": "publish",
                 "hub.topic": topic,
-                "hub.content": payload
+                "hub.content": json.dumps(payload),
             }
-            response = client.post(url, headers=headers, data=data)
+            response = client.post(url, data=data)
             response.raise_for_status()

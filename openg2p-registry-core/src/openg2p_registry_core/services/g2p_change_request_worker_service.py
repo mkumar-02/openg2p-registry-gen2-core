@@ -18,6 +18,8 @@ class G2PChangeRequestWorkerService(BaseService):
         change_request_request_payload: ChangeRequestRequestPayload,
         session: AsyncSession,
         source_partner_id: Optional[str] = None,
+        created_by: str | None = None,
+        change_request_source: str | None = None,
     ) -> G2PRegisterChangeRequest:
         change_request_service = G2PRegisterChangeRequestService.get_component()
         g2p_register_definition: G2PRegisterDefinition = await change_request_service.validate_register_definition(
@@ -36,16 +38,15 @@ class G2PChangeRequestWorkerService(BaseService):
             section_register_definition,
         )
 
-        # Extract internal_record_id from change_payload if present
-        # Note: For new record creation, internal_record_id may be a new UUID that doesn't exist yet
-        # We don't validate internal_record_id existence here - it will be created when the change request is approved
-
         g2p_register_change_request: G2PRegisterChangeRequest = await change_request_service.construct_change_request(
             change_request_request_payload,
             g2p_register_section,
             g2p_register_definition.register_mnemonic,
             section_register_definition.register_mnemonic,
             source_partner_id,
+            created_by,
+            change_request_source_override=change_request_source,
+            session=session,
         )
 
         session.add(g2p_register_change_request)

@@ -67,6 +67,9 @@ class G2PIntakeFormSubmission(BaseORMModel):
     deduplication_register_forms_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     deduplication_register_error: Mapped[str] = mapped_column(Text, nullable=True)
 
+    awe_request_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    awe_request_status_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+
 
 G2PIntakeFormSubmissions = G2PIntakeFormSubmission
 

@@ -3,12 +3,13 @@ import logging
 from openg2p_fastapi_common.service import BaseService
 from openg2p_fastapi_common.context import dbengine
 
-from sqlalchemy import Date as select, func, and_
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from ..models import (
     DataModel,
     G2PIntakeFormDefinition,
     G2PRegisterDefinition,
+    G2PRegisterSection,
     IncomingClassifiedData,
     IncomingEnrichedTransformedData,
     IncomingPartner,
@@ -58,7 +59,7 @@ class G2PIngestionDataService(BaseService):
     
     async def search_in_ingestion_data(
             self, search_text: str, current_page: int = 1, page_size: int = 10, sort_by: str = None, filter_by: dict = None
-        ) -> tuple[list[IngestionDataSearchResultData], int, int]:
+        ) -> tuple[list[IngestionDataSearchResultData], int]:
         _logger.info("Searching in ingestion data through service")
         master_data_engine = get_engines().get("db_engine_master_data")
         master_data_session_maker = async_sessionmaker(master_data_engine, expire_on_commit=False)
@@ -68,7 +69,7 @@ class G2PIngestionDataService(BaseService):
             search_results, total_items = await self._search_in_ingestion_data(search_text, current_page, page_size, filter_by, session, master_data_session, sort_by)
             return search_results, total_items
     
-    async def get_raw_data_payload(self, ingest_id: int) -> IngestionDataPayload:
+    async def get_raw_data_payload(self, ingest_id: str) -> IngestionDataPayload:
         _logger.info("Fetching raw payload through service")
         session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
 
@@ -76,11 +77,13 @@ class G2PIngestionDataService(BaseService):
             incoming_raw_data_payload = (
                 await session.execute(select(IncomingRawDataPayload).where(IncomingRawDataPayload.ingest_id == ingest_id))
             ).scalar_one_or_none()
-            return IngestionDataPayload (
-                raw_data_json = incoming_raw_data_payload.raw_data_json,
+            if not incoming_raw_data_payload:
+                return IngestionDataPayload(raw_data_json=None)
+            return IngestionDataPayload(
+                raw_data_json=incoming_raw_data_payload.raw_data_json,
             )
     
-    async def get_enriched_and_transformed_data_payload(self, ingest_id: int) -> IngestionDataPayload:
+    async def get_enriched_and_transformed_data_payload(self, ingest_id: str) -> IngestionDataPayload:
         _logger.info("Fetching enriched and transformed data payload through service")
         session_maker = async_sessionmaker(dbengine.get(), expire_on_commit=False)
 
@@ -88,9 +91,11 @@ class G2PIngestionDataService(BaseService):
             incoming_enriched_and_transformed_data_payload: IncomingEnrichedTransformedData | None = (
                 await session.execute(select(IncomingEnrichedTransformedData).where(IncomingEnrichedTransformedData.ingest_id == ingest_id))
             ).scalar_one_or_none()
-            return IngestionDataPayload (
-                enriched_data_json = incoming_enriched_and_transformed_data_payload.enriched_data_json or None,
-                transformed_data_json = incoming_enriched_and_transformed_data_payload.transformed_data_json or None,
+            if not incoming_enriched_and_transformed_data_payload:
+                return IngestionDataPayload(enriched_data_json=None, transformed_data_json=None)
+            return IngestionDataPayload(
+                enriched_data_json=incoming_enriched_and_transformed_data_payload.enriched_data_json or None,
+                transformed_data_json=incoming_enriched_and_transformed_data_payload.transformed_data_json or None,
             )
     
     async def _search_in_ingestion_data(self, search_text: str, current_page: int, page_size: int, filter_by: dict, session, master_data_session, sort_by: str = None) -> tuple[list[IngestionDataSearchResultData], int]:
@@ -160,6 +165,12 @@ class G2PIngestionDataService(BaseService):
                 G2PRegisterDefinition.register_mnemonic,
                 IncomingClassifiedData.semantic_pattern_id,
 
+                IncomingClassifiedData.pipeline_action,
+                IncomingClassifiedData.section_id,
+                G2PRegisterSection.section_mnemonic.label("classified_section_mnemonic"),
+                IncomingClassifiedData.internal_record_id,
+                IncomingClassifiedData.change_request_id,
+
                 IncomingTemplate.template_id,
                 IncomingTemplate.template_file_id,
 
@@ -196,6 +207,14 @@ class G2PIngestionDataService(BaseService):
             .outerjoin(
                 G2PIntakeFormDefinition,
                 G2PIntakeFormDefinition.form_id == IncomingClassifiedData.intake_form_id,
+            )
+
+            .outerjoin(
+                G2PRegisterSection,
+                and_(
+                    G2PRegisterSection.section_id == IncomingClassifiedData.section_id,
+                    G2PRegisterSection.register_id == IncomingClassifiedData.register_id,
+                ),
             )
 
             # needed for template
@@ -248,6 +267,11 @@ class G2PIngestionDataService(BaseService):
                     register_id=row.register_id,
                     register_mnemonic=row.register_mnemonic,
                     semantic_pattern_id=row.semantic_pattern_id,
+                    pipeline_action=row.pipeline_action,
+                    section_id=row.section_id,
+                    section_mnemonic=row.classified_section_mnemonic,
+                    internal_record_id=row.internal_record_id,
+                    change_request_id=row.change_request_id,
                     template_id=row.template_id,
                     template_file_id=row.template_file_id,
                     transformation_status=row.transformation_status,
